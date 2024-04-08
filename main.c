@@ -3,14 +3,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <dbuf.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #define SCR_WIDTH 800
 #define SCR_HEIGHT 600
 
-void readShader(struct dbuf *dbuf, char *path);
+const char* readShader(char *path);
 void processInput(GLFWwindow *window);
 void windowResize(GLFWwindow *window, int width, int height);
 
@@ -77,31 +76,24 @@ int main(void) {
 	// unbinding VAO
 	glBindVertexArray(0);
 
-	struct dbuf vert = DBUF_INIT;
-	struct dbuf frag = DBUF_INIT;
 
 	// compiling vertex shader
-	readShader(&vert, "./shaders/shader.vert");
+	const char *vert = readShader("shaders/shader.vert");
 
 	unsigned int vertexShader;
 	vertexShader = glCreateShader(GL_VERTEX_SHADER);
 	
-	glShaderSource(vertexShader, 1, &(vert.data), NULL);
+	glShaderSource(vertexShader, 1, &vert, NULL);
 	glCompileShader(vertexShader);
 
-	dbufFree(&vert);
-
 	// compiling fragment shader
-	readShader(&frag, "./shaders/shader.frag");
+	const char *frag = readShader("shaders/shader.frag");
 
 	unsigned int fragmentShader;
 	fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 	
-	glShaderSource(fragmentShader, 1, &(frag.data), NULL);
+	glShaderSource(fragmentShader, 1, &frag, NULL);
 	glCompileShader(fragmentShader);
-
-	dbufFree(&frag);
-	
 
 	// checking shaders compilation status
 	int success;
@@ -157,17 +149,32 @@ int main(void) {
 	return 0;
 }
 
-void readShader(struct dbuf *dbuf, char *path) {
+const char* readShader(char *path) {
+	fflush(stdin);
+
 	FILE *fp;
 	fp = fopen(path, "r");
 
+	char *res = 0;
+	int length = 0;
+	char buffer[256];
+
 	if(fp) {
-		char buffer[100];
-		while (fgets(buffer, sizeof(buffer), fp))
-			dbufAppend(dbuf, buffer, strlen(buffer));
+		while (fgets(buffer, 256, fp)) {
+			res = realloc(res, strlen(buffer) + length + 1);
+			memcpy(res+length, buffer, strlen(buffer));
+			length += strlen(buffer);
+			res[length] = '\0';
+		}
 	}
 	else
 		printf("ERROR: Reading shader!\n");
+
+	fclose(fp);
+
+	fflush(stdin);
+	return res;
+
 }
 		
 
