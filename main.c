@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,7 +10,8 @@
 #define SCR_WIDTH 800
 #define SCR_HEIGHT 600
 
-const char* readShader(char *path);
+const char* readShader(const char *path);
+unsigned int compileShader(const char *vert, const char *frag);
 void processInput(GLFWwindow *window);
 void windowResize(GLFWwindow *window, int width, int height);
 
@@ -76,59 +78,7 @@ int main(void) {
 	// unbinding VAO
 	glBindVertexArray(0);
 
-
-	// compiling vertex shader
-	const char *vert = readShader("shaders/shader.vert");
-
-	unsigned int vertexShader;
-	vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	
-	glShaderSource(vertexShader, 1, &vert, NULL);
-	glCompileShader(vertexShader);
-
-	// compiling fragment shader
-	const char *frag = readShader("shaders/shader.frag");
-
-	unsigned int fragmentShader;
-	fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	
-	glShaderSource(fragmentShader, 1, &frag, NULL);
-	glCompileShader(fragmentShader);
-
-	// checking shaders compilation status
-	int success;
-	char infoLog[512];
-
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		printf("ERROR: Vertex Shader\n%s\n", infoLog);
-	}
-
-	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-		printf("ERROR: Fragment Shader\n%s\n", infoLog);
-	}
-
-	// shader program
-	unsigned int shaderProgram;
-	shaderProgram = glCreateProgram();
-
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
-
-	// deleting shaders after linking
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
-
-	// checking shader program linking status
-	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-	if (!success) {
-		glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-		printf("ERROR: Linking shader program\n%s\n", infoLog);
-	}
+    GLuint shaderProgram = compileShader("shaders/shader.vert", "shaders/shader.frag");
 
 	while (!glfwWindowShouldClose(window)) {
 		processInput(window);
@@ -136,6 +86,9 @@ int main(void) {
 		glClearColor(0.6f, 1.0f, 0.9f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);		
 
+		float timeVal = glfwGetTime();
+		float greenVal = (sin(timeVal) / 2.0f) + 0.5f;
+		glUniform4f(glGetUniformLocation(shaderProgram, "ourColor"), 0.0f, greenVal, 0.0f, 1.0f);
 
 		glUseProgram(shaderProgram);
 		glBindVertexArray(VAO);
@@ -149,7 +102,35 @@ int main(void) {
 	return 0;
 }
 
-const char* readShader(char *path) {
+int checkProgramLink(GLuint shaderProgram) {
+    // checking shaders compilation status
+    int success;
+    char infoLog[512];
+
+    // checking shader program linking status
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+        printf("ERROR: Linking shader program\n%s\n", infoLog);
+    }
+}
+
+int checkShaderCompile(GLuint shader) {
+    // checking shaders compilation status
+    int success, flag = 1;
+    char infoLog[512];
+
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(shader, 512, NULL, infoLog);
+        printf("ERROR: Vertex Shader\n%s\n", infoLog);
+        flag = 0;
+    }
+
+    return flag;
+}
+
+const char* readShader(const char *path) {
 	fflush(stdin);
 
 	FILE *fp;
@@ -171,12 +152,51 @@ const char* readShader(char *path) {
 		printf("ERROR: Reading shader!\n");
 
 	fclose(fp);
-
-	fflush(stdin);
 	return res;
 
 }
-		
+
+unsigned int compileShader(const char *vertPath, const char *fragPath) {
+	// compiling vertex shader
+    const char *vert = readShader(vertPath);
+                                                          
+    unsigned int vertexShader;
+    vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    
+    glShaderSource(vertexShader, 1, &vert, NULL);
+    glCompileShader(vertexShader);
+                                                          
+    // compiling fragment shader
+    const char *frag = readShader(fragPath);
+                                                          
+    unsigned int fragmentShader;
+    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    
+    glShaderSource(fragmentShader, 1, &frag, NULL);
+    glCompileShader(fragmentShader);
+
+    // checking shader compilation
+    checkShaderCompile(vertexShader);
+    checkShaderCompile(fragmentShader);
+
+	// shader program
+    unsigned int shaderProgram;
+    shaderProgram = glCreateProgram();
+                                                   
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+                                                   
+    // deleting shaders after linking
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    // freeing mem
+    free(vert);
+    free(frag);
+
+    return shaderProgram;
+}
 
 void processInput(GLFWwindow *window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
